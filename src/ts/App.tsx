@@ -1,48 +1,32 @@
-import produce from 'immer';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import '../App.css';
-import { randColor } from './utils';
+import { randColor } from './common/utils';
 import { Poll } from './components/Poll';
 import { Ring } from './components/Ring';
-import { phantomValue, emptyList, max, widthBase, pollWidth, pollHeight, height } from './consts';
-
-let onMouseUpGlobal: { (arg0: number): void; (towerNum: number): void };
+import { phantomValue, emptyList, max, widthBase, pollWidth, pollHeight, height } from './common/consts';
+import { moveTower } from './moveTower';
+import { Provider, useSelector } from 'react-redux';
+import { store, toggleHanging, TowersState } from './store';
 
 export default function App() {
-  // const [towers, setTowers] = useState([[0, 1, 2], [3, 4, 5], [6]]);
-  const [towers, setTowers] = useState([[6, 5, 4, 3, 2, 1, 0], [], []]);
-  const [hanging, setHanging] = useState(phantomValue);
+  return (
+    <Provider store={store}>
+      <AppLogic />
+    </Provider>
+  );
+}
 
-  const onMouseUp = (onMouseUpGlobal = (towerNum: number) => {
-    if (hanging === phantomValue) {
-      select(towerNum);
-    } else {
-      move(towerNum);
-    }
-  });
+function AppLogic() {
+  const towers = useSelector<TowersState, number[][]>((state) => state.towers);
+  const hanging = useSelector<TowersState, number>((state) => state.hanging);
 
-  function select(towerNum: number) {
-    const newTowers = produce(towers, (towers) => {
-      const val = towers[towerNum].pop();
-      setHanging(val!);
-    });
-    setTowers(newTowers);
-  }
-  function move(dest: number) {
-    const tower = towers[dest];
-    const lastRingValue = tower[tower.length - 1];
-    const isEmptyTower = !tower.length;
-    if (isEmptyTower || hanging < lastRingValue) {
-      const newTowers = produce(towers, (towers) => {
-        towers[dest].push(hanging);
-      });
-      setHanging(phantomValue);
-      setTowers(newTowers);
-    }
-  }
+  const onShowSolution = () => moveTower(1, 3, max);
 
   return (
     <div className="App">
+      <div>
+        <button onClick={onShowSolution}>Show Solution</button>
+      </div>
       <div
         style={{
           position: 'fixed',
@@ -51,7 +35,7 @@ export default function App() {
         }}
       >
         <Hanging hanging={hanging} />
-        {Towers(towers, onMouseUp)}
+        {Towers(towers)}
       </div>
     </div>
   );
@@ -65,25 +49,24 @@ function Hanging({ hanging }: { hanging: number }) {
   return <div style={{ paddingBottom: 60 }}>{getRingByValue(hanging)}</div>;
 }
 
-function Towers(towers: number[][], onMouseUp: (towerNum: number) => void) {
+function Towers(towers: number[][]) {
   return (
     <div style={{ display: 'flex', justifyContent: 'center' }}>
       {towers.map((tower, i) => (
-        <Tower arr={tower} idx={i} key={tower.join(',') + i} onMouseUp={onMouseUp} />
+        <Tower arr={tower} idx={i} key={tower.join(',') + i} />
       ))}
     </div>
   );
 }
 
-function Tower({ arr, idx, onMouseUp }: { arr: number[]; idx: number; onMouseUp: (towerNum: number) => void }) {
+function Tower({ arr, idx }: { arr: number[]; idx: number }) {
   const valuesOfTower = useMemo(() => {
-    console.log(1);
     return [...arr, ...emptyList].reverse().slice(-max);
   }, [arr]);
 
   return (
     <div
-      onMouseUp={() => onMouseUp(idx)}
+      onMouseUp={() => toggleHanging(idx)}
       style={{
         position: 'relative',
         minWidth: max * widthBase,
@@ -101,33 +84,4 @@ function Tower({ arr, idx, onMouseUp }: { arr: number[]; idx: number; onMouseUp:
 
 function getRingByValue(val: number) {
   return <Ring width={(val + 1) * widthBase} height={height} color={val === phantomValue ? 'none' : randColor(val)} />;
-}
-
-// (async function steps() {
-//   await moveTower(1, 3, 7);
-// })();
-
-async function moveTower(from: number, to: number, n: number) {
-  if (n === 1) {
-    await step(from, to);
-  } else {
-    const other = 6 - from - to;
-    await moveTower(from, other, n - 1);
-    await step(from, to);
-    await moveTower(other, to, n - 1);
-  }
-}
-
-async function step(from: number, to: number) {
-  await action(from);
-  await action(to);
-}
-
-function action(n: number) {
-  return new Promise<void>((resolve) =>
-    setTimeout(() => {
-      onMouseUpGlobal(n - 1);
-      resolve();
-    }, 200)
-  );
 }
